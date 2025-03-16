@@ -4,4 +4,5 @@ lxml==4.9.3
 python-telegram-bot==20.0
 telegram==0.0.1
 python-dotenv==1.0.0
+apscheduler
 
