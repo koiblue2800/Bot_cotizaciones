@@ -114,6 +114,7 @@ async def monitorear_dolar(inicial=False):
 async def monitorear_stablecoins(inicial=False):
     global ultimo_cripto
     precios = obtener_precio_cripto()
+    print("Datos obtenidos para stablecoins:", precios)  # Registro para depuración
     mensaje_crypto = "🚀 *Precios de Stablecoins* 🚀\n"
     cambios = False
 
@@ -131,14 +132,14 @@ async def monitorear_stablecoins(inicial=False):
                 else:
                     simbolo_cambio = ""
 
-                if simbolo_cambio or inicial:
+                if inicial or simbolo_cambio:
                     mensaje_crypto += f"🔹 *{cripto.upper()}*: *${precio_actual} USD* ({simbolo_cambio})\n"
             else:
                 mensaje_crypto += f"🔹 *{cripto.upper()}*: *${precio_actual} USD*\n"
                 ultimo_cripto[cripto] = precio_actual
                 cambios = True
 
-    if cambios or inicial:
+    if inicial or cambios:  # Forzar envío inicial
         mensaje_crypto += "\nℹ️ Información proporcionada por CoinGecko."
         await enviar_mensaje(mensaje_crypto)
 
