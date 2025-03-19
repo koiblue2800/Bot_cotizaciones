@@ -18,8 +18,7 @@ if precios:
                 mensaje_crypto += f"🔹 *{cripto.upper()}*: *${precio_actual} USD*\n"
                 ultimo_cripto[cripto] = precio_actual
                 cambios = True
-
-    if cambios or inicial:
+if cambios or inicial:
         mensaje_crypto += "\nℹ️ Información proporcionada por CoinGecko."
         await enviar_mensaje(mensaje_crypto)
 
