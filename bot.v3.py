@@ -1,10 +1,11 @@
 import os
-import requests
 import telegram
 import asyncio
+from pycoingecko import CoinGeckoAPI
 from dotenv import load_dotenv
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from flask import Flask
+import requests
 
 # Cargar variables de entorno
 load_dotenv()
@@ -12,20 +13,20 @@ TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 COINGECKO_API_KEY = os.getenv("COINGECKO_API_KEY")
 
-if not TOKEN or not CHAT_ID:
-    raise ValueError("Error: TELEGRAM_BOT_TOKEN o TELEGRAM_CHAT_ID no están definidos en .env")
+if not TOKEN or not CHAT_ID or not COINGECKO_API_KEY:
+    raise ValueError("Error: TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID o COINGECKO_API_KEY no están definidos en .env")
 
 bot = telegram.Bot(token=TOKEN)
 scheduler = AsyncIOScheduler()
+cg = CoinGeckoAPI(api_key=COINGECKO_API_KEY)
 
-# Configurar Flask para mantener un servidor activo
+# Configurar Flask
 app = Flask(__name__)
 
 @app.route("/")
 def home():
     return "¡El bot está funcionando correctamente!"
 
-# URLs de cotización del dólar
 dolar_urls = {
     "💵 Dólar Blue": "https://dolarapi.com/v1/ambito/dolares/blue",
     "💰 Dólar Oficial": "https://dolarapi.com/v1/ambito/dolares/oficial",
@@ -33,13 +34,10 @@ dolar_urls = {
     "📈 Dólar Mayorista": "https://dolarapi.com/v1/ambito/dolares/mayorista",
 }
 
-# Criptomonedas a monitorear (solo para consulta directa por URL)
 stablecoins = ["tether", "usd-coin", "dai", "binance-usd"]
-
-# Diccionarios para guardar valores previos
 ultimo_dolar = {}
 ultimo_cripto = {}
-tendencias_enviadas = False  # Para enviar las tendencias solo 1 vez al inicio
+tendencias_enviadas = False
 
 def obtener_cotizacion(url):
     try:
@@ -51,32 +49,16 @@ def obtener_cotizacion(url):
         return None
 
 def obtener_precio_stablecoins():
-    """Consulta directamente los precios de las stablecoins desde el endpoint sin la clave de API"""
-    url = "https://api.coingecko.com/api/v3/simple/price"
-    params = {
-        "ids": ','.join(stablecoins),  # Lista de stablecoins a consultar
-        "vs_currencies": "usd"        # Moneda de comparación
-    }
     try:
-        response = requests.get(url, params=params, timeout=10)
-        print("Respuesta directa de stablecoins:", response.status_code, response.json())  # Para depuración
-        response.raise_for_status()
-        return response.json()
-    except requests.RequestException as e:
+        return cg.get_price(ids=stablecoins, vs_currencies="usd")
+    except Exception as e:
         print(f"❌ Error al obtener precios de stablecoins: {e}")
         return None
 
 def obtener_tendencias_cripto():
-    """Consulta tendencias utilizando la clave de API"""
-    url = "https://api.coingecko.com/api/v3/search/trending"
-    headers = {
-        "x-cg-pro-api-key": COINGECKO_API_KEY  # Clave API
-    }
     try:
-        response = requests.get(url, headers=headers, timeout=10)
-        response.raise_for_status()
-        return response.json()
-    except requests.RequestException as e:
+        return cg.get_search_trending()
+    except Exception as e:
         print(f"❌ Error al obtener tendencias de criptos: {e}")
         return None
 
@@ -88,7 +70,6 @@ async def enviar_mensaje(texto):
         print(f"❌ Error al enviar mensaje: {e}")
 
 async def enviar_mensaje_inicial():
-    """Envía un mensaje inicial con todas las cotizaciones y tendencias"""
     await monitorear_dolar(inicial=True)
     await monitorear_stablecoins(inicial=True)
     await enviar_tendencias()
@@ -114,7 +95,6 @@ async def monitorear_dolar(inicial=False):
 async def monitorear_stablecoins(inicial=False):
     global ultimo_cripto
     precios = obtener_precio_stablecoins()
-    print("Datos obtenidos para stablecoins:", precios)  # Registro para depuración
     mensaje_crypto = "🚀 *Precios de Stablecoins* 🚀\n"
     cambios = False
 
@@ -125,17 +105,12 @@ async def monitorear_stablecoins(inicial=False):
 
             if precio_anterior is not None:
                 diferencia = precio_actual - precio_anterior
-                if diferencia > 0:
-                    simbolo_cambio = f"+{diferencia:.2f}"
-                elif diferencia < 0:
-                    simbolo_cambio = f"{diferencia:.2f}"
-                else:
-                    simbolo_cambio = ""
-
-                if inicial or simbolo_cambio:
-                    mensaje_crypto += f"🔹 *{cripto.upper()}*: *${precio_actual} USD* ({simbolo_cambio})\n"
+                simbolo_cambio = f" ({'+' if diferencia > 0 else ''}{diferencia:.2f})" if diferencia != 0 else ""
             else:
-                mensaje_crypto += f"🔹 *{cripto.upper()}*: *${precio_actual} USD*\n"
+                simbolo_cambio = ""
+
+            if inicial or simbolo_cambio:
+                mensaje_crypto += f"🔹 *{cripto.upper()}*: *${precio_actual} USD*{simbolo_cambio}\n"
                 ultimo_cripto[cripto] = precio_actual
                 cambios = True
 
@@ -146,7 +121,7 @@ async def monitorear_stablecoins(inicial=False):
 async def enviar_tendencias():
     global tendencias_enviadas
     if tendencias_enviadas:
-        return  # No enviar de nuevo si ya se enviaron una vez
+        return  
 
     tendencias = obtener_tendencias_cripto()
     mensaje_tendencias = "📈 *Tendencias de criptomonedas* 📈\n"
@@ -159,15 +134,14 @@ async def enviar_tendencias():
 
         mensaje_tendencias += "\nℹ️ Información proporcionada por CoinGecko."
         await enviar_mensaje(mensaje_tendencias)
-        tendencias_enviadas = True  # Marcar como enviadas para que no se repitan
+        tendencias_enviadas = True  
 
 async def main():
-    """Función principal que inicia el bot y programa las actualizaciones"""
-    await enviar_mensaje_inicial()  # Enviar el mensaje inicial
+    await enviar_mensaje_inicial()  
 
     scheduler.add_job(monitorear_dolar, 'interval', minutes=5)
     scheduler.add_job(monitorear_stablecoins, 'interval', minutes=5)
-    scheduler.add_job(enviar_tendencias, 'interval', days=1)  # Enviar tendencias una vez al día
+    scheduler.add_job(enviar_tendencias, 'interval', days=1)  
     scheduler.start()
 
     print("🚀 Bot en ejecución 24/7 monitoreando cambios...")
@@ -175,7 +149,6 @@ async def main():
         await asyncio.sleep(1)
 
 if __name__ == "__main__":
-    # Ejecutar Flask y el bot en paralelo
     import threading
     threading.Thread(target=lambda: app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)), debug=False)).start()
     asyncio.run(main())
