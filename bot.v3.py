@@ -10,10 +10,10 @@ from flask import Flask
 load_dotenv()
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
-COINGECKO_API_KEY = os.getenv("COINGECKO_API_KEY")  # Clave API desde el archivo .env
+COINGECKO_API_KEY = os.getenv("COINGECKO_API_KEY")
 
-if not TOKEN or not CHAT_ID or not COINGECKO_API_KEY:
-    raise ValueError("Error: TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID o COINGECKO_API_KEY no están definidos en .env")
+if not TOKEN or not CHAT_ID:
+    raise ValueError("Error: TELEGRAM_BOT_TOKEN o TELEGRAM_CHAT_ID no están definidos en .env")
 
 bot = telegram.Bot(token=TOKEN)
 scheduler = AsyncIOScheduler()
@@ -33,7 +33,7 @@ dolar_urls = {
     "📈 Dólar Mayorista": "https://dolarapi.com/v1/ambito/dolares/mayorista",
 }
 
-# Criptomonedas a monitorear
+# Criptomonedas a monitorear (solo para consulta directa por URL)
 stablecoins = ["tether", "usd-coin", "dai", "binance-usd"]
 
 # Diccionarios para guardar valores previos
@@ -50,18 +50,16 @@ def obtener_cotizacion(url):
         print(f"❌ Error al obtener datos de {url}: {e}")
         return None
 
-def obtener_precio_cripto():
+def obtener_precio_stablecoins():
+    """Consulta directamente los precios de las stablecoins desde el endpoint sin la clave de API"""
     url = "https://api.coingecko.com/api/v3/simple/price"
     params = {
         "ids": ','.join(stablecoins),  # Lista de stablecoins a consultar
-        "vs_currencies": "usd"  # Moneda de comparación
-    }
-    headers = {
-        "x-cg-pro-api-key": COINGECKO_API_KEY  # Clave API
+        "vs_currencies": "usd"        # Moneda de comparación
     }
     try:
-        response = requests.get(url, params=params, headers=headers, timeout=10)
-        print("Respuesta de CoinGecko:", response.status_code, response.text)  # Registro para depuración
+        response = requests.get(url, params=params, timeout=10)
+        print("Respuesta directa de stablecoins:", response.status_code, response.json())  # Para depuración
         response.raise_for_status()
         return response.json()
     except requests.RequestException as e:
@@ -69,6 +67,7 @@ def obtener_precio_cripto():
         return None
 
 def obtener_tendencias_cripto():
+    """Consulta tendencias utilizando la clave de API"""
     url = "https://api.coingecko.com/api/v3/search/trending"
     headers = {
         "x-cg-pro-api-key": COINGECKO_API_KEY  # Clave API
@@ -114,7 +113,7 @@ async def monitorear_dolar(inicial=False):
 
 async def monitorear_stablecoins(inicial=False):
     global ultimo_cripto
-    precios = obtener_precio_cripto()
+    precios = obtener_precio_stablecoins()
     print("Datos obtenidos para stablecoins:", precios)  # Registro para depuración
     mensaje_crypto = "🚀 *Precios de Stablecoins* 🚀\n"
     cambios = False
@@ -140,7 +139,7 @@ async def monitorear_stablecoins(inicial=False):
                 ultimo_cripto[cripto] = precio_actual
                 cambios = True
 
-    if inicial or cambios:  # Forzar el envío en la primera ejecución
+    if inicial or cambios:
         mensaje_crypto += "\nℹ️ Información proporcionada por CoinGecko."
         await enviar_mensaje(mensaje_crypto)
 
