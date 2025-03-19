@@ -61,6 +61,7 @@ def obtener_precio_cripto():
     }
     try:
         response = requests.get(url, params=params, headers=headers, timeout=10)
+        print("Respuesta de CoinGecko:", response.status_code, response.text)  # Registro para depuración
         response.raise_for_status()
         return response.json()
     except requests.RequestException as e:
@@ -162,20 +163,4 @@ async def enviar_tendencias():
         tendencias_enviadas = True  # Marcar como enviadas para que no se repitan
 
 async def main():
-    """Función principal que inicia el bot y programa las actualizaciones"""
-    await enviar_mensaje_inicial()  # Enviar el mensaje inicial
-
-    scheduler.add_job(monitorear_dolar, 'interval', minutes=5)
-    scheduler.add_job(monitorear_stablecoins, 'interval', minutes=5)
-    scheduler.add_job(enviar_tendencias, 'interval', days=1)  # Enviar tendencias una vez al día
-    scheduler.start()
-
-    print("🚀 Bot en ejecución 24/7 monitoreando cambios...")
-    while True:
-        await asyncio.sleep(1)
-
-if __name__ == "__main__":
-    # Ejecutar Flask y el bot en paralelo
-    import threading
-    threading.Thread(target=lambda: app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)), debug=False)).start()
-    asyncio.run(main())
+    """Función principal que inicia el bot y programa las actual
