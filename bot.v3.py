@@ -10,7 +10,7 @@ from flask import Flask
 load_dotenv()
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
-COINGECKO_API_KEY = os.getenv("COINGECKO_API_KEY")  # Nueva variable para la API key
+COINGECKO_API_KEY = os.getenv("COINGECKO_API_KEY")  # Se agrega la clave de CoinGecko
 
 if not TOKEN or not CHAT_ID or not COINGECKO_API_KEY:
     raise ValueError("Error: TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID o COINGECKO_API_KEY no están definidos en .env")
@@ -57,7 +57,7 @@ def obtener_precio_cripto():
         "vs_currencies": "usd"
     }
     headers = {
-        "x-cg-pro-api-key": COINGECKO_API_KEY  # Aquí se agrega el encabezado con la API key
+        "x-cg-pro-api-key": COINGECKO_API_KEY  # Se incluye la API key en los encabezados
     }
     try:
         response = requests.get(url, params=params, headers=headers, timeout=10)
@@ -70,7 +70,7 @@ def obtener_precio_cripto():
 def obtener_tendencias_cripto():
     url = "https://api.coingecko.com/api/v3/search/trending"
     headers = {
-        "x-cg-pro-api-key": COINGECKO_API_KEY  # Aquí se agrega el encabezado con la API key
+        "x-cg-pro-api-key": COINGECKO_API_KEY  # Se incluye la API key en los encabezados
     }
     try:
         response = requests.get(url, headers=headers, timeout=10)
