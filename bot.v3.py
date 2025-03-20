@@ -10,9 +10,10 @@ from flask import Flask
 load_dotenv()
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
+COINGECKO_API_KEY = os.getenv("COINGECKO_API_KEY")
 
-if not TOKEN or not CHAT_ID:
-    raise ValueError("Error: TELEGRAM_BOT_TOKEN o TELEGRAM_CHAT_ID no están definidos en .env")
+if not TOKEN or not CHAT_ID or not COINGECKO_API_KEY:
+    raise ValueError("Error: TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID o COINGECKO_API_KEY no están definidos en .env")
 
 bot = telegram.Bot(token=TOKEN)
 scheduler = AsyncIOScheduler()
@@ -50,7 +51,8 @@ def obtener_precio_stablecoins():
     params = {
         "ids": ",".join(stablecoins),
         "vs_currencies": "usd",
-        "include_last_updated_at": "true"
+        "include_last_updated_at": "true",
+        "x_cg_demo_api_key": COINGECKO_API_KEY
     }
     try:
         response = requests.get(url, params=params, timeout=10)
@@ -65,8 +67,11 @@ def obtener_precio_stablecoins():
 
 def obtener_tendencias_cripto():
     url = "https://api.coingecko.com/api/v3/search/trending"
+    params = {
+        "x_cg_demo_api_key": COINGECKO_API_KEY
+    }
     try:
-        response = requests.get(url, timeout=10)
+        response = requests.get(url, params=params, timeout=10)
         if response.status_code == 429:
             print("Límite de tasa excedido. Esperando...")
             return None
