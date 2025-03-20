@@ -10,10 +10,9 @@ from flask import Flask
 load_dotenv()
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
-COINGECKO_API_KEY = os.getenv("COINGECKO_API_KEY")
 
-if not TOKEN or not CHAT_ID or not COINGECKO_API_KEY:
-    raise ValueError("Error: TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID o COINGECKO_API_KEY no están definidos en .env")
+if not TOKEN or not CHAT_ID:
+    raise ValueError("Error: TELEGRAM_BOT_TOKEN o TELEGRAM_CHAT_ID no están definidos en .env")
 
 bot = telegram.Bot(token=TOKEN)
 scheduler = AsyncIOScheduler()
@@ -27,7 +26,7 @@ def home():
 
 dolar_urls = {
     "💵 Dólar Blue": "https://dolarapi.com/v1/ambito/dolares/blue",
-    "💰 Dólar Oficial": "https://dolarapi.com/v1/ambito/dolares/oficial",
+    "💰 Dólar Oficial": "https://dolarapi.com/v1/ambito/dolares/oficial", 
     "💳 Dólar Tarjeta": "https://dolarapi.com/v1/ambito/dolares/tarjeta",
     "📈 Dólar Mayorista": "https://dolarapi.com/v1/ambito/dolares/mayorista",
 }
@@ -47,14 +46,17 @@ def obtener_cotizacion(url):
         return None
 
 def obtener_precio_stablecoins():
-    url = "https://pro-api.coingecko.com/api/v3/simple/price"
-    headers = {"x-cg-pro-api-key": COINGECKO_API_KEY}
+    url = "https://api.coingecko.com/api/v3/simple/price"
     params = {
         "ids": ",".join(stablecoins),
-        "vs_currencies": "usd"
+        "vs_currencies": "usd",
+        "include_last_updated_at": "true"
     }
     try:
-        response = requests.get(url, headers=headers, params=params, timeout=10)
+        response = requests.get(url, params=params, timeout=10)
+        if response.status_code == 429:
+            print("Límite de tasa excedido. Esperando...")
+            return None
         response.raise_for_status()
         return response.json()
     except requests.RequestException as e:
@@ -62,10 +64,12 @@ def obtener_precio_stablecoins():
         return None
 
 def obtener_tendencias_cripto():
-    url = "https://pro-api.coingecko.com/api/v3/search/trending"
-    headers = {"x-cg-pro-api-key": COINGECKO_API_KEY}
+    url = "https://api.coingecko.com/api/v3/search/trending"
     try:
-        response = requests.get(url, headers=headers, timeout=10)
+        response = requests.get(url, timeout=10)
+        if response.status_code == 429:
+            print("Límite de tasa excedido. Esperando...")
+            return None
         response.raise_for_status()
         return response.json()
     except requests.RequestException as e:
@@ -111,7 +115,8 @@ async def monitorear_stablecoins(inicial=False):
     if precios:
         for cripto, datos in precios.items():
             precio_actual = datos.get("usd")
-            precio_anterior = ultimo_cripto.get(cripto, None)
+            ultimo_update = datos.get("last_updated_at", "N/A")
+            precio_anterior = ultimo_cripto.get(cripto, {}).get("precio")
 
             if precio_anterior is not None:
                 diferencia = precio_actual - precio_anterior
@@ -121,7 +126,7 @@ async def monitorear_stablecoins(inicial=False):
 
             if inicial or simbolo_cambio:
                 mensaje_crypto += f"🔹 *{cripto.upper()}*: *${precio_actual} USD*{simbolo_cambio}\n"
-                ultimo_cripto[cripto] = precio_actual
+                ultimo_cripto[cripto] = {"precio": precio_actual, "ultimo_update": ultimo_update}
                 cambios = True
 
     if inicial or cambios:
@@ -136,27 +141,31 @@ async def enviar_tendencias():
     tendencias = obtener_tendencias_cripto()
     mensaje_tendencias = "📈 *Tendencias de criptomonedas* 📈\n"
 
-    if tendencias:
-        for idx, moneda in enumerate(tendencias.get("coins", []), start=1):
-            nombre = moneda["item"]["name"]
-            simbolo = moneda["item"]["symbol"].upper()
+    if tendencias and "coins" in tendencias:
+        for idx, moneda in enumerate(tendencias["coins"][:7], start=1):
+            item = moneda.get("item", {})
+            nombre = item.get("name", "N/A")
+            simbolo = item.get("symbol", "N/A").upper()
             mensaje_tendencias += f"🔸 *Top {idx}:* {nombre} ({simbolo})\n"
 
         mensaje_tendencias += "\nℹ️ Información proporcionada por CoinGecko."
         await enviar_mensaje(mensaje_tendencias)
-        tendencias_enviadas = True  
+        tendencias_enviadas = True
 
 async def main():
-    await enviar_mensaje_inicial()  
+    try:
+        await enviar_mensaje_inicial()
+        
+        scheduler.add_job(monitorear_dolar, 'interval', minutes=5)
+        scheduler.add_job(monitorear_stablecoins, 'interval', minutes=5)
+        scheduler.add_job(enviar_tendencias, 'interval', days=1)
+        scheduler.start()
 
-    scheduler.add_job(monitorear_dolar, 'interval', minutes=5)
-    scheduler.add_job(monitorear_stablecoins, 'interval', minutes=5)
-    scheduler.add_job(enviar_tendencias, 'interval', days=1)  
-    scheduler.start()
-
-    print("🚀 Bot en ejecución 24/7 monitoreando cambios...")
-    while True:
-        await asyncio.sleep(1)
+        print("🚀 Bot en ejecución 24/7 monitoreando cambios...")
+        while True:
+            await asyncio.sleep(1)
+    except Exception as e:
+        print(f"Error en main: {e}")
 
 if __name__ == "__main__":
     import threading
