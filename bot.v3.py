@@ -33,10 +33,37 @@ dolar_urls = {
 }
 
 stablecoins = ["tether", "usd-coin", "dai", "binance-usd"]
+ultimo_dolar = {}
 ultimo_cripto = {}
 tendencias_enviadas = False
 
-# Obtener precios de stablecoins
+def obtener_cotizacion(url):
+    try:
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()
+        return response.json()
+    except requests.RequestException as e:
+        print(f"❌ Error al obtener datos de {url}: {e}")
+        return None
+
+async def monitorear_dolar(inicial=False):
+    global ultimo_dolar
+    mensaje_dolar = "📊 *Cotización del Dólar en Argentina* 📊\n"
+    cambios = False
+
+    for nombre, url in dolar_urls.items():
+        data = obtener_cotizacion(url)
+        if data:
+            compra, venta = data.get("compra"), data.get("venta")
+            if inicial or nombre not in ultimo_dolar or ultimo_dolar[nombre] != (compra, venta):
+                mensaje_dolar += f"\n{nombre}:\n💵 Compra: *{compra}*\n💲 Venta: *{venta}*"
+                ultimo_dolar[nombre] = (compra, venta)
+                cambios = True
+
+    if cambios or inicial:
+        mensaje_dolar += "\nℹ️ Información proporcionada por Ámbito Financiero."
+        await enviar_mensaje(mensaje_dolar)
+
 def obtener_precio_stablecoins():
     url = "https://pro-api.coingecko.com/api/v3/simple/price"
     headers = {"x-cg-pro-api-key": COINGECKO_API_KEY}
@@ -52,7 +79,6 @@ def obtener_precio_stablecoins():
         print(f"❌ Error al obtener precios de stablecoins: {e}")
         return None
 
-# Obtener tendencias de criptomonedas
 def obtener_tendencias_cripto():
     url = "https://pro-api.coingecko.com/api/v3/search/trending"
     headers = {"x-cg-pro-api-key": COINGECKO_API_KEY}
@@ -64,7 +90,6 @@ def obtener_tendencias_cripto():
         print(f"❌ Error al obtener tendencias de criptomonedas: {e}")
         return None
 
-# Enviar mensaje al chat
 async def enviar_mensaje(texto):
     try:
         async with bot:
@@ -72,7 +97,6 @@ async def enviar_mensaje(texto):
     except Exception as e:
         print(f"❌ Error al enviar mensaje: {e}")
 
-# Monitorear y enviar precios de stablecoins
 async def monitorear_stablecoins(inicial=False):
     global ultimo_cripto
     precios = obtener_precio_stablecoins()
@@ -99,7 +123,6 @@ async def monitorear_stablecoins(inicial=False):
         mensaje_crypto += "\nℹ️ Información proporcionada por CoinGecko."
         await enviar_mensaje(mensaje_crypto)
 
-# Enviar tendencias de criptomonedas
 async def enviar_tendencias():
     global tendencias_enviadas
     if tendencias_enviadas:
@@ -118,23 +141,20 @@ async def enviar_tendencias():
         await enviar_mensaje(mensaje_tendencias)
         tendencias_enviadas = True
 
-# Función principal
 async def main():
-    await monitorear_dolar(inicial=True)  # Mantener lógica original del dólar
-    await monitorear_stablecoins(inicial=True)  # Enviar precios iniciales de stablecoins
-    await enviar_tendencias()  # Enviar tendencias iniciales
+    await monitorear_dolar(inicial=True)
+    await monitorear_stablecoins(inicial=True)
+    await enviar_tendencias()
 
-    # Programar tareas periódicas
     scheduler.add_job(monitorear_dolar, 'interval', minutes=5)
     scheduler.add_job(monitorear_stablecoins, 'interval', minutes=5)
-    scheduler.add_job(enviar_tendencias, 'interval', days=1)  
+    scheduler.add_job(enviar_tendencias, 'interval', days=1)
     scheduler.start()
 
     print("🚀 Bot en ejecución 24/7 monitoreando cambios...")
     while True:
         await asyncio.sleep(1)
 
-# Iniciar la aplicación y el bot
 if __name__ == "__main__":
     import threading
     threading.Thread(target=lambda: app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)), debug=False)).start()
