@@ -46,24 +46,6 @@ def obtener_cotizacion(url):
         print(f"❌ Error al obtener datos de {url}: {e}")
         return None
 
-async def monitorear_dolar(inicial=False):
-    global ultimo_dolar
-    mensaje_dolar = "📊 *Cotización del Dólar en Argentina* 📊\n"
-    cambios = False
-
-    for nombre, url in dolar_urls.items():
-        data = obtener_cotizacion(url)
-        if data:
-            compra, venta = data.get("compra"), data.get("venta")
-            if inicial or nombre not in ultimo_dolar or ultimo_dolar[nombre] != (compra, venta):
-                mensaje_dolar += f"\n{nombre}:\n💵 Compra: *{compra}*\n💲 Venta: *{venta}*"
-                ultimo_dolar[nombre] = (compra, venta)
-                cambios = True
-
-    if cambios or inicial:
-        mensaje_dolar += "\nℹ️ Información proporcionada por Ámbito Financiero."
-        await enviar_mensaje(mensaje_dolar)
-
 def obtener_precio_stablecoins():
     url = "https://pro-api.coingecko.com/api/v3/simple/price"
     headers = {"x-cg-pro-api-key": COINGECKO_API_KEY}
@@ -87,7 +69,7 @@ def obtener_tendencias_cripto():
         response.raise_for_status()
         return response.json()
     except requests.RequestException as e:
-        print(f"❌ Error al obtener tendencias de criptomonedas: {e}")
+        print(f"❌ Error al obtener tendencias de criptos: {e}")
         return None
 
 async def enviar_mensaje(texto):
@@ -96,6 +78,29 @@ async def enviar_mensaje(texto):
             await bot.send_message(chat_id=CHAT_ID, text=texto, parse_mode="Markdown")
     except Exception as e:
         print(f"❌ Error al enviar mensaje: {e}")
+
+async def enviar_mensaje_inicial():
+    await monitorear_dolar(inicial=True)
+    await monitorear_stablecoins(inicial=True)
+    await enviar_tendencias()
+
+async def monitorear_dolar(inicial=False):
+    global ultimo_dolar
+    mensaje_dolar = "📊 *Cotización del Dólar en Argentina* 📊\n"
+    cambios = False
+
+    for nombre, url in dolar_urls.items():
+        data = obtener_cotizacion(url)
+        if data:
+            compra, venta = data.get("compra"), data.get("venta")
+            if inicial or nombre not in ultimo_dolar or ultimo_dolar[nombre] != (compra, venta):
+                mensaje_dolar += f"\n{nombre}:\n💵 Compra: *{compra}*\n💲 Venta: *{venta}*"
+                ultimo_dolar[nombre] = (compra, venta)
+                cambios = True
+
+    if cambios or inicial:
+        mensaje_dolar += "\nℹ️ Información proporcionada por Ámbito Financiero."
+        await enviar_mensaje(mensaje_dolar)
 
 async def monitorear_stablecoins(inicial=False):
     global ultimo_cripto
@@ -126,7 +131,7 @@ async def monitorear_stablecoins(inicial=False):
 async def enviar_tendencias():
     global tendencias_enviadas
     if tendencias_enviadas:
-        return
+        return  
 
     tendencias = obtener_tendencias_cripto()
     mensaje_tendencias = "📈 *Tendencias de criptomonedas* 📈\n"
@@ -139,16 +144,14 @@ async def enviar_tendencias():
 
         mensaje_tendencias += "\nℹ️ Información proporcionada por CoinGecko."
         await enviar_mensaje(mensaje_tendencias)
-        tendencias_enviadas = True
+        tendencias_enviadas = True  
 
 async def main():
-    await monitorear_dolar(inicial=True)
-    await monitorear_stablecoins(inicial=True)
-    await enviar_tendencias()
+    await enviar_mensaje_inicial()  
 
     scheduler.add_job(monitorear_dolar, 'interval', minutes=5)
     scheduler.add_job(monitorear_stablecoins, 'interval', minutes=5)
-    scheduler.add_job(enviar_tendencias, 'interval', days=1)
+    scheduler.add_job(enviar_tendencias, 'interval', days=1)  
     scheduler.start()
 
     print("🚀 Bot en ejecución 24/7 monitoreando cambios...")
