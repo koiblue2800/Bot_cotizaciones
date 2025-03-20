@@ -1,11 +1,10 @@
 import os
 import telegram
 import asyncio
-from pycoingecko import CoinGeckoAPI
+import requests
 from dotenv import load_dotenv
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from flask import Flask
-import requests
 
 # Cargar variables de entorno
 load_dotenv()
@@ -18,7 +17,6 @@ if not TOKEN or not CHAT_ID or not COINGECKO_API_KEY:
 
 bot = telegram.Bot(token=TOKEN)
 scheduler = AsyncIOScheduler()
-cg = CoinGeckoAPI(api_key=COINGECKO_API_KEY)
 
 # Configurar Flask
 app = Flask(__name__)
@@ -49,16 +47,28 @@ def obtener_cotizacion(url):
         return None
 
 def obtener_precio_stablecoins():
+    url = "https://pro-api.coingecko.com/api/v3/simple/price"
+    headers = {"x-cg-pro-api-key": COINGECKO_API_KEY}
+    params = {
+        "ids": ",".join(stablecoins),
+        "vs_currencies": "usd"
+    }
     try:
-        return cg.get_price(ids=stablecoins, vs_currencies="usd")
-    except Exception as e:
+        response = requests.get(url, headers=headers, params=params, timeout=10)
+        response.raise_for_status()
+        return response.json()
+    except requests.RequestException as e:
         print(f"❌ Error al obtener precios de stablecoins: {e}")
         return None
 
 def obtener_tendencias_cripto():
+    url = "https://pro-api.coingecko.com/api/v3/search/trending"
+    headers = {"x-cg-pro-api-key": COINGECKO_API_KEY}
     try:
-        return cg.get_search_trending()
-    except Exception as e:
+        response = requests.get(url, headers=headers, timeout=10)
+        response.raise_for_status()
+        return response.json()
+    except requests.RequestException as e:
         print(f"❌ Error al obtener tendencias de criptos: {e}")
         return None
 
