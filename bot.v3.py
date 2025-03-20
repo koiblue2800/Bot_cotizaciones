@@ -110,6 +110,7 @@ async def monitorear_stablecoins(inicial=False):
     precios = obtener_precio_stablecoins()
     mensaje_crypto = "🚀 *Precios de Stablecoins* 🚀\n"
     cambios = False
+    umbral_cambio_stablecoins = 0.5  # Umbral del 0.5%
 
     if precios:
         for cripto, datos in precios.items():
@@ -117,13 +118,15 @@ async def monitorear_stablecoins(inicial=False):
             precio_anterior = ultimo_cripto.get(cripto, {}).get("precio")
 
             if precio_anterior is not None:
-                diferencia = precio_actual - precio_anterior
-                simbolo_cambio = f" ({'+' if diferencia > 0 else ''}{diferencia:.2f})" if diferencia != 0 else ""
+                variacion = abs(precio_actual - precio_anterior) / precio_anterior * 100
+                if variacion >= umbral_cambio_stablecoins:
+                    simbolo_cambio = f" ({'+' if precio_actual > precio_anterior else ''}{precio_actual - precio_anterior:.2f})"
+                    mensaje_crypto += f"🔹 *{cripto.upper()}*: *${precio_actual} USD*{simbolo_cambio} (Variación: {variacion:.2f}%)\n"
+                    ultimo_cripto[cripto] = {"precio": precio_actual}
+                    cambios = True
             else:
-                simbolo_cambio = ""
-
-            if inicial or simbolo_cambio:
-                mensaje_crypto += f"🔹 *{cripto.upper()}*: *${precio_actual} USD*{simbolo_cambio}\n"
+                # Inicialización de los precios
+                mensaje_crypto += f"🔹 *{cripto.upper()}*: *${precio_actual} USD*\n"
                 ultimo_cripto[cripto] = {"precio": precio_actual}
                 cambios = True
 
