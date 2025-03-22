@@ -5,6 +5,13 @@ import requests
 from dotenv import load_dotenv
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from flask import Flask
+from datetime import datetime, timedelta
+import pytz
+
+# Configuración de zona horaria para Argentina
+zona_argentina = pytz.timezone("America/Argentina/Buenos_Aires")
+ultimo_envio_tendencias = None
+ultimo_envio_stablecoins = None
 
 # Cargar variables de entorno
 load_dotenv()
@@ -34,7 +41,6 @@ dolar_urls = {
 stablecoins = ["tether", "usd-coin", "dai", "binance-usd"]
 ultimo_dolar = {}
 ultimo_cripto = {}
-tendencias_enviadas = False
 
 def obtener_cotizacion(url):
     try:
@@ -106,11 +112,14 @@ async def monitorear_dolar(inicial=False):
         await enviar_mensaje(mensaje_dolar)
 
 async def monitorear_stablecoins(inicial=False):
-    global ultimo_cripto
+    global ultimo_cripto, ultimo_envio_stablecoins
     precios = obtener_precio_stablecoins()
     mensaje_crypto = "🚀 *Precios de Stablecoins* 🚀\n"
     cambios = False
     umbral_cambio_stablecoins = 0.5  # Umbral del 0.5%
+
+    # Obtener hora actual en Argentina
+    ahora_arg = datetime.now(zona_argentina)
 
     if precios:
         for cripto, datos in precios.items():
@@ -130,13 +139,17 @@ async def monitorear_stablecoins(inicial=False):
                 ultimo_cripto[cripto] = {"precio": precio_actual}
                 cambios = True
 
-    if inicial or cambios:
+    if inicial or cambios or (ultimo_envio_stablecoins is None or ahora_arg - ultimo_envio_stablecoins >= timedelta(days=1)):
         mensaje_crypto += "\nℹ️ Información proporcionada por CoinGecko."
         await enviar_mensaje(mensaje_crypto)
+        ultimo_envio_stablecoins = ahora_arg
 
 async def enviar_tendencias():
-    global tendencias_enviadas
-    if tendencias_enviadas:
+    global ultimo_envio_tendencias
+    ahora_arg = datetime.now(zona_argentina)
+
+    # Asegurar envío diario
+    if ultimo_envio_tendencias and ahora_arg - ultimo_envio_tendencias < timedelta(days=1):
         return  
 
     tendencias = obtener_tendencias_cripto()
@@ -151,7 +164,7 @@ async def enviar_tendencias():
 
         mensaje_tendencias += "\nℹ️ Información proporcionada por CoinGecko."
         await enviar_mensaje(mensaje_tendencias)
-        tendencias_enviadas = True
+        ultimo_envio_tendencias = ahora_arg
 
 async def main():
     try:
@@ -159,7 +172,7 @@ async def main():
         
         scheduler.add_job(monitorear_dolar, 'interval', minutes=5)
         scheduler.add_job(monitorear_stablecoins, 'interval', minutes=5)
-        scheduler.add_job(enviar_tendencias, 'interval', days=1)
+        scheduler.add_job(enviar_tendencias, 'cron', hour=9, timezone="America/Argentina/Buenos_Aires")  # Envía a las 9 AM
         scheduler.start()
 
         print("🚀 Bot en ejecución 24/7 monitoreando cambios...")
