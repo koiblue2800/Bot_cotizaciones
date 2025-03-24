@@ -13,6 +13,8 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from webdriver_manager.chrome import ChromeDriverManager
 from prettytable import PrettyTable
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 
 # Configuración básica de logs
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -59,7 +61,8 @@ def obtener_cotizaciones_dolar():
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
     url = "https://www.ambito.com/"
     driver.get(url)
-    asyncio.sleep(5)
+    wait = WebDriverWait(driver, 10)
+    wait.until(EC.presence_of_element_located((By.CLASS_NAME, 'variation-max-min')))
     datos_dolar = {}
     try:
         secciones = driver.find_elements(By.CLASS_NAME, 'variation-max-min')
