@@ -15,6 +15,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 from prettytable import PrettyTable
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+import requests
 
 # Configuración básica de logs
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
