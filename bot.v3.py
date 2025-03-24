@@ -11,10 +11,10 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
-from webdriver_manager.chrome import ChromeDriverManager
-from prettytable import PrettyTable
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from webdriver_manager.chrome import ChromeDriverManager
+from prettytable import PrettyTable
 import requests
 
 # Configuración básica de logs
@@ -117,7 +117,7 @@ async def monitorear_stablecoins():
                 mensaje_crypto += f"🔹 *{cripto.upper()}*: *${precio_actual} USD*\n"
                 ultimo_cripto[cripto] = {"precio": precio_actual}
                 cambios = True
-        if cambios:
+        if cambios or not ultimo_envio_stablecoins:
             await enviar_mensaje(mensaje_crypto)
             ultimo_envio_stablecoins = datetime.now(zona_argentina)
     except Exception as e:
@@ -138,7 +138,7 @@ async def enviar_tendencias():
             nombre = item.get("name", "N/A")
             simbolo = item.get("symbol", "N/A").upper()
             mensaje_tendencias += f"🔸 *Top {idx}:* {nombre} ({simbolo})\n"
-        if tendencias:
+        if tendencias or not ultimo_envio_tendencias:
             await enviar_mensaje(mensaje_tendencias)
             ultimo_envio_tendencias = datetime.now(zona_argentina)
     except Exception as e:
@@ -146,13 +146,18 @@ async def enviar_tendencias():
 
 async def main():
     try:
-        # Enviar mensaje inicial
-        await enviar_mensaje("🚀 Bot iniciado y monitoreando tareas.")
-
-        scheduler.add_job(enviar_tendencias, 'interval', minutes=60)
-        scheduler.add_job(monitorear_stablecoins, 'interval', minutes=10)
+        # Enviar mensajes iniciales
+        logging.info("🚀 Enviando mensajes iniciales.")
+        await monitorear_dolar()
+        await monitorear_stablecoins()
+        await enviar_tendencias()
+        
+        # Agregar tareas al scheduler
         scheduler.add_job(monitorear_dolar, 'interval', minutes=5)
+        scheduler.add_job(monitorear_stablecoins, 'interval', minutes=10)
+        scheduler.add_job(enviar_tendencias, 'interval', minutes=60)
         scheduler.start()
+
         logging.info("🚀 Bot iniciado y monitoreando tareas.")
         while True:
             await asyncio.sleep(1)
