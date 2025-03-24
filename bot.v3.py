@@ -87,6 +87,7 @@ async def monitorear_dolar():
     mensaje_dolar = "📊 *Cotización del Dólar en Argentina* 📊\n"
     cambios = False
     datos = obtener_cotizaciones_dolar()
+    logging.info(f"Datos obtenidos del dólar: {datos}")
     for titulo, valores in datos.items():
         compra = valores["compra"]
         venta = valores["venta"]
@@ -107,6 +108,7 @@ async def monitorear_stablecoins():
         response = requests.get(url, params=params, timeout=10)
         response.raise_for_status()
         precios = response.json()
+        logging.info(f"Precios obtenidos de stablecoins: {precios}")
         mensaje_crypto = "🚀 *Precios de Stablecoins* 🚀\n"
         cambios = False
         for cripto, datos in precios.items():
@@ -129,6 +131,7 @@ async def enviar_tendencias():
         response = requests.get(url, timeout=10)
         response.raise_for_status()
         tendencias = response.json()
+        logging.info(f"Tendencias obtenidas: {tendencias}")
         mensaje_tendencias = "📈 *Tendencias de criptomonedas* 📈\n"
         for idx, moneda in enumerate(tendencias.get("coins", [])[:7], start=1):
             item = moneda.get("item", {})
@@ -145,10 +148,10 @@ async def main():
     try:
         # Enviar mensaje inicial
         await enviar_mensaje("🚀 Bot iniciado y monitoreando tareas.")
-        
-        scheduler.add_job(monitorear_dolar, 'interval', minutes=5)
-        scheduler.add_job(monitorear_stablecoins, 'interval', minutes=10)
+
         scheduler.add_job(enviar_tendencias, 'interval', minutes=60)
+        scheduler.add_job(monitorear_stablecoins, 'interval', minutes=10)
+        scheduler.add_job(monitorear_dolar, 'interval', minutes=5)
         scheduler.start()
         logging.info("🚀 Bot iniciado y monitoreando tareas.")
         while True:
