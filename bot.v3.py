@@ -12,7 +12,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from webdriver_manager.chrome import ChromeDriverManager
-from prettytable import PrettyTable  # Para mostrar los datos en formato tabla
+from prettytable import PrettyTable  # Para mostrar los datos en formato de tabla
 
 # Configuración básica de logs
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -56,8 +56,6 @@ def obtener_cotizaciones_dolar():
     asyncio.sleep(5)
 
     # Extraer cotizaciones
-    tabla = PrettyTable()
-    tabla.field_names = ["Título", "Compra/Referencia", "Venta", "Última Actualización"]
     datos_dolar = {}
 
     try:
@@ -77,12 +75,10 @@ def obtener_cotizaciones_dolar():
                 fecha = seccion.find_element(By.CSS_SELECTOR, 'span.variation-max-min__date-time').text
 
                 datos_dolar[titulo] = {"compra": compra, "venta": venta, "fecha": fecha}
-                tabla.add_row([titulo, compra, venta, fecha])
 
             except Exception as e:
                 logging.error(f"No se pudieron extraer datos de una sección: {e}")
 
-        logging.info(f"Tabla generada:\n{tabla}")
     except Exception as e:
         logging.error(f"Error al extraer datos: {e}")
     finally:
@@ -101,12 +97,14 @@ async def monitorear_dolar():
         venta = valores["venta"]
         fecha = valores["fecha"]
 
+        # Verifica si es la primera ejecución o si hubo cambios
         if titulo not in ultimo_dolar or ultimo_dolar[titulo] != (compra, venta, fecha):
             mensaje_dolar += f"\n💵 {titulo}:\n💳 Compra: *{compra}*\n💰 Venta: *{venta}*\n🕒 Actualización: *{fecha}*"
             ultimo_dolar[titulo] = (compra, venta, fecha)
             cambios = True
 
-    if cambios:
+    # Enviar mensaje inicial o si hay cambios
+    if cambios or not ultimo_dolar:
         await enviar_mensaje(mensaje_dolar)
 
 async def enviar_mensaje(texto):
