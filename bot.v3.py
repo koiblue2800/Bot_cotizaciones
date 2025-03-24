@@ -139,6 +139,9 @@ async def enviar_tendencias():
 
 async def main():
     try:
+        # Enviar mensaje inicial
+        await enviar_mensaje("🚀 Bot iniciado y monitoreando tareas.")
+        
         scheduler.add_job(monitorear_dolar, 'interval', minutes=5)
         scheduler.add_job(monitorear_stablecoins, 'interval', minutes=10)
         scheduler.add_job(enviar_tendencias, 'interval', minutes=60)
